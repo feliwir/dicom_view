@@ -1,13 +1,15 @@
 #include "include/dicom_view/texture_gl.h"
-
+#include "../cpp/dicom_view_common.h"
 #include <epoxy/gl.h>
 
 struct _TextureGL {
   FlTextureGL parent_instance;
   guint32 target;
+  guint32 fbo;
   guint32 name;
   guint32 width;
   guint32 height;
+  DicomViewCommon *common;
 };
 
 G_DEFINE_TYPE(TextureGL, texture_gl, fl_texture_gl_get_type())
@@ -17,16 +19,18 @@ static void texture_gl_init(TextureGL *self) {
   self->name = 0;
   self->width = 0;
   self->height = 0;
+  self->common = NULL;
 }
 
 static void texture_gl_dispose(GObject *object) {
-  TextureGL* self = TEXTURE_GL(object);
+  TextureGL *self = TEXTURE_GL(object);
   if (self->name != 0) {
     glDeleteTextures(1, &self->name);
     self->name = 0;
   }
   self->width = 0;
   self->height = 0;
+  self->common = NULL;
 
   G_OBJECT_CLASS(texture_gl_parent_class)->dispose(object);
 }
@@ -43,24 +47,54 @@ TextureGL *texture_gl_new() {
   return self;
 }
 
+void texture_gl_set_dicom_common(TextureGL *self, DicomViewCommon *common) {
+  self->common = common;
+}
+
 gboolean texture_gl_populate(FlTextureGL *texture, guint32 *target,
                              guint32 *name, guint32 *width, guint32 *height,
                              GError **error) {
-  g_message("texture_gl_populate: %d %d %d %d", *target, *name, *width, *height);
-  TextureGL* self = TEXTURE_GL(texture);
+  g_message("texture_gl_populate: %d %d %d %d", *target, *name, *width,
+            *height);
+  TextureGL *self = TEXTURE_GL(texture);
 
-  if (self->name == 0) {
+  self->width = *width;
+  self->height = *height;
+
+  // Recreate texture & FBI
+  if (self->name == 0 && self->fbo == 0) {
+    // Create FBO
+    glGenFramebuffers(1, &self->fbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, self->fbo);
+
+    // Create texture
     glGenTextures(1, &self->name);
     glBindTexture(GL_TEXTURE_2D, self->name);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    guint8 pixel[] = {0, 0, 0, 128};
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1, 1,
-          0, GL_RGBA, GL_UNSIGNED_BYTE, pixel);
-    self->width = 1;
-    self->height = 1;
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, self->width, self->height, 0,
+                 GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+
+    // Attach texture to FBO
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+                           self->name, 0);
+  } else {
+    // Rebind texture & FBO
+    glBindTexture(GL_TEXTURE_2D, self->name);
+    glBindFramebuffer(GL_FRAMEBUFFER, self->fbo);
+  }
+
+  if (self->common) {
+    // Populate texture with DICOM image
+    g_message("dicom_view_common_render_gl");
+    int result =
+        dicom_view_common_render_gl(self->common, self->width, self->height);
+    if (result != 0) {
+      g_message("failed to render texture");
+      return FALSE;
+    }
   }
 
   *target = GL_TEXTURE_2D;
@@ -68,6 +102,5 @@ gboolean texture_gl_populate(FlTextureGL *texture, guint32 *target,
   *width = self->width;
   *height = self->height;
 
-  // Populate texture with DICOM image
   return TRUE;
 }

@@ -1,10 +1,12 @@
 #include "include/dicom_view/dicom_view.h"
+#include "../cpp/dicom_view_common.h"
 #include "include/dicom_view/texture_gl.h"
 
 struct _DicomView {
   GObject parent_instance;
   FlTextureRegistrar *texture_registrar;
   TextureGL *texture;
+  DicomViewCommon *common;
   gint64 id;
 };
 
@@ -19,7 +21,11 @@ FlMethodResponse *dicom_view_set_dicom_file_fl(DicomView *view,
 
 static void dicom_view_class_init(DicomViewClass *klass) {}
 
-static void dicom_view_init(DicomView *self) {}
+static void dicom_view_init(DicomView *self) {
+  self->common = dicom_view_common_new();
+  self->texture = texture_gl_new();
+  texture_gl_set_dicom_common(self->texture, self->common);
+}
 
 // Called when a method call is received from Flutter.
 static void dicom_view_handle_method_call(DicomView *self,
@@ -33,8 +39,7 @@ static void dicom_view_handle_method_call(DicomView *self,
 
   if (strcmp(method, "getTextureId") == 0) {
     response = dicom_view_get_texture_id_fl(self);
-  }
-  else if (strcmp(method, "setDicomFile") == 0) {
+  } else if (strcmp(method, "setDicomFile") == 0) {
     const gchar *file_path =
         fl_value_get_string(fl_value_lookup_string(args, "file"));
     g_message("dicom_view_handle_method_call: setFile: %s", file_path);
@@ -58,7 +63,6 @@ DicomView *dicom_view_new(FlTextureRegistrar *texture_registrar,
   DicomView *self = DICOM_VIEW(g_object_new(DICOM_VIEW_TYPE, NULL));
   self->id = dicom_view_id++;
   self->texture_registrar = texture_registrar;
-  self->texture = texture_gl_new();
   fl_texture_registrar_register_texture(self->texture_registrar,
                                         FL_TEXTURE(self->texture));
 
@@ -89,7 +93,8 @@ gint64 dicom_view_get_texture_id(DicomView *self) {
 
 gboolean dicom_view_set_dicom_path(DicomView *self, const gchar *dicom_file) {
   g_message("dicom_view_set_dicom_path: %s", dicom_file);
-  return TRUE;
+  int result = dicom_view_common_load_file(self->common, dicom_file);
+  return result == 0;
 }
 
 FlMethodResponse *dicom_view_get_texture_id_fl(DicomView *self) {

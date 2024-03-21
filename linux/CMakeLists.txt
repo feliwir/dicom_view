@@ -19,6 +19,8 @@ list(APPEND PLUGIN_SOURCES
   # Common source
   "../cpp/dicom_view_common.cpp"
   "../cpp/dicom_view_common.h"
+  "../cpp/dicom_view_render_gl.cpp"
+  "../cpp/dicom_view_render_gl.h"
 )
 
 # Define the plugin library target. Its name must not be changed (see comment

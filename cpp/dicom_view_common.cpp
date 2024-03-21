@@ -1,45 +1,56 @@
 #include "dicom_view_common.h"
-#include <gdcmImageReader.h>
+#include "dicom_view_render_gl.h"
 #include <epoxy/gl.h>
+#include <flutter_linux/flutter_linux.h>
+#include <gdcmImageReader.h>
 
 struct _DicomViewCommon {
   gdcm::ImageReader reader;
+
+  // OpenGL
+  unsigned int name = 0;
+  unsigned int program = 0;
 };
 
-DicomViewCommon* dicom_view_common_new() {
-  return new DicomViewCommon();
-}
+DicomViewCommon *dicom_view_common_new() { return new DicomViewCommon(); }
 
-
-int dicom_view_common_dispose(DicomViewCommon* handle) {
+int dicom_view_common_dispose(DicomViewCommon *handle) {
+  if (handle->name != 0) {
+    glDeleteTextures(1, &handle->name);
+    handle->name = 0;
+  }
   delete handle;
   return 0;
 }
 
-int dicom_view_common_load_file(DicomViewCommon* handle, const char* file_path) {
+int dicom_view_common_load_file(DicomViewCommon *handle,
+                                const char *file_path) {
   handle->reader.SetFileName(file_path);
   if (!handle->reader.Read()) {
     return 1;
   }
+
+  // Load the image
+  gdcm::Image &image = handle->reader.GetImage();
+
+  // OpenGL
+  glGenTextures(1, &handle->name);
+  glBindTexture(GL_TEXTURE_2D, handle->name);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  dicom_view_render_gl_upload(handle->name, image);
+
   return 0;
 }
 
-int dicom_view_common_upload_gl_texture(DicomViewCommon* handle, unsigned int* target, unsigned int* name, unsigned int* width, unsigned int* height) {
-  gdcm::Image& image = handle->reader.GetImage();
-  *width = image.GetDimension(0);
-  *height = image.GetDimension(1);
-  *target = GL_TEXTURE_2D;
-  glGenTextures(1, name);
-  glBindTexture(GL_TEXTURE_2D, *name);
-  char* buffer = new char[image.GetBufferLength()];
-  if(image.GetBuffer(buffer)) {
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, *width, *height, 0, GL_LUMINANCE, GL_UNSIGNED_SHORT, buffer);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  }
-  else
-  {
-    return 1;
-  }
+int dicom_view_common_render_gl(DicomViewCommon *handle, unsigned int width,
+                                unsigned int height) {
+  // Create our program
+  dicom_view_render_gl_create_program(&handle->program);
+  // Render our image
+  dicom_view_render_gl_draw(handle->program, handle->name, width, height);
+
   return 0;
 }
