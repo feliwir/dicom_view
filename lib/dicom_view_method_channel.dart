@@ -17,12 +17,9 @@ class MethodChannelDicomViewPlatform extends DicomViewPlatform {
   }
 
   @override
-  Future<MethodChannelDicomView?> createViewChannel() async {
+  Future<int?> createViewChannel() async {
     final viewId = await methodChannel.invokeMethod<int>('createView');
-    if (viewId == null) {
-      return null;
-    }
-    return MethodChannelDicomView(viewId);
+    return viewId;
   }
 }
 

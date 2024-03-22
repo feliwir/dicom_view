@@ -3,6 +3,7 @@
 // package as the core of your plugin.
 // ignore: avoid_web_libraries_in_flutter
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
 import 'dicom_view_method_channel.dart';
@@ -11,6 +12,9 @@ import 'dicom_view_method_channel.dart';
 class DicomViewLinux extends StatefulWidget {
   @visibleForTesting
   final methodChannel = MethodChannelDicomViewPlatform();
+  final PlatformViewCreatedCallback? onPlatformViewCreated;
+
+  DicomViewLinux({this.onPlatformViewCreated});
 
   @override
   State<StatefulWidget> createState() {
@@ -20,15 +24,18 @@ class DicomViewLinux extends StatefulWidget {
 
 class _DicomViewLinuxState extends State<DicomViewLinux> {
   int _textureId = 0;
-  MethodChannelDicomView? viewChannel;
+  // Create a MethodChannelDicomView instance to poll if we have a textureId
+  MethodChannelDicomView? _viewChannel;
 
   @override
   void initState() {
     super.initState();
     widget.methodChannel.createViewChannel().then((value) => {
           setState(() {
-            viewChannel = value;
-            viewChannel?.setDicomFile(file: 'test.dcm');
+            if (value != null) {
+              widget.onPlatformViewCreated?.call(value);
+              _viewChannel = MethodChannelDicomView(value);
+            }
           })
         });
   }
@@ -36,7 +43,7 @@ class _DicomViewLinuxState extends State<DicomViewLinux> {
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<int?>(
-        future: viewChannel?.getTextureId(),
+        future: _viewChannel?.getTextureId(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
             return Text('Error: ${snapshot.error}');

@@ -12,7 +12,7 @@ class DicomViewPlugin {
     return DicomViewPlatform.instance.getPlatformVersion();
   }
 
-  Future<MethodChannelDicomView?> createView() {
+  Future<int?> createView() {
     return DicomViewPlatform.instance.createViewChannel();
   }
 }
@@ -43,7 +43,9 @@ class DicomView extends StatelessWidget {
           gestureRecognizers: const <Factory<OneSequenceGestureRecognizer>>{},
         );
       case TargetPlatform.linux:
-        return DicomViewLinux();
+        return DicomViewLinux(
+          onPlatformViewCreated: _onPlatformViewCreated,
+        );
       default:
         throw UnsupportedError("Unsupported platform view");
     }
@@ -55,12 +57,11 @@ class DicomView extends StatelessWidget {
 }
 
 class DicomViewController {
-  final MethodChannel _channel;
+  final MethodChannelDicomView _channel;
 
-  DicomViewController._(int id)
-      : _channel = MethodChannel('plugins.dicom_view/dicom_view_$id');
+  DicomViewController._(int id) : _channel = MethodChannelDicomView(id);
 
   Future<void> setFile({required String file}) async {
-    return _channel.invokeMethod('setFile', file);
+    return _channel.setDicomFile(file: file);
   }
 }

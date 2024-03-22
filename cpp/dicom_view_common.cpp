@@ -7,6 +7,9 @@
 struct _DicomViewCommon {
   gdcm::ImageReader reader;
 
+  void (*update_cb)(int, void *) = nullptr;
+  void *update_cb_user_data = nullptr;
+
   // OpenGL
   unsigned int name = 0;
   unsigned int program = 0;
@@ -42,6 +45,19 @@ int dicom_view_common_load_file(DicomViewCommon *handle,
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
   dicom_view_render_gl_upload(handle->name, image);
 
+  if (handle->update_cb) {
+    handle->update_cb(DICOM_VIEW_COMMON_UPDATE_EVENT_IMAGE,
+                      handle->update_cb_user_data);
+  }
+
+  return 0;
+}
+
+int dicom_view_common_set_update_callback(DicomViewCommon *handle,
+                                          void (*update_cb)(int, void *),
+                                          void *user_data) {
+  handle->update_cb = update_cb;
+  handle->update_cb_user_data = user_data;
   return 0;
 }
 

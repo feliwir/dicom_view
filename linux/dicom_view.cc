@@ -94,6 +94,8 @@ gint64 dicom_view_get_texture_id(DicomView *self) {
 gboolean dicom_view_set_dicom_path(DicomView *self, const gchar *dicom_file) {
   g_message("dicom_view_set_dicom_path: %s", dicom_file);
   int result = dicom_view_common_load_file(self->common, dicom_file);
+  if(result != 0)
+    g_message("dicom_view_set_dicom_path FAILED");
   return result == 0;
 }
 

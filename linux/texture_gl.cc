@@ -47,8 +47,25 @@ TextureGL *texture_gl_new() {
   return self;
 }
 
+static void texture_gl_update_callback(int reason, void *user_data) {
+  TextureGL *self = TEXTURE_GL(user_data);
+  g_message("texture_gl_update_callback");
+  if (self->fbo && self->name) {
+    glBindTexture(GL_TEXTURE_2D, self->name);
+    glBindFramebuffer(GL_FRAMEBUFFER, self->fbo);
+    int result =
+        dicom_view_common_render_gl(self->common, self->width, self->height);
+    if (result != 0) {
+      g_message("failed to render texture");
+    }
+  }
+}
+
 void texture_gl_set_dicom_common(TextureGL *self, DicomViewCommon *common) {
+  g_message("texture_gl_set_dicom_common");
   self->common = common;
+  dicom_view_common_set_update_callback(common, texture_gl_update_callback,
+                                        self);
 }
 
 gboolean texture_gl_populate(FlTextureGL *texture, guint32 *target,

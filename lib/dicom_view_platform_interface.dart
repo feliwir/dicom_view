@@ -27,7 +27,7 @@ abstract class DicomViewPlatform extends PlatformInterface {
     throw UnimplementedError('platformVersion() has not been implemented.');
   }
 
-  Future<MethodChannelDicomView?> createViewChannel() {
+  Future<int?> createViewChannel() {
     throw UnimplementedError('createView() has not been implemented.');
   }
 }
