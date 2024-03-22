@@ -14,7 +14,19 @@ struct _TextureGL {
 
 G_DEFINE_TYPE(TextureGL, texture_gl, fl_texture_gl_get_type())
 
+void GLAPIENTRY MessageCallback(GLenum source, GLenum type, GLuint id,
+                                GLenum severity, GLsizei length,
+                                const GLchar *message, const void *userParam) {
+  g_message("GL CALLBACK: %s type = 0x%x, severity = 0x%x, message = %s\n",
+            (type == GL_DEBUG_TYPE_ERROR ? "** GL ERROR **" : ""), type,
+            severity, message);
+}
+
 static void texture_gl_init(TextureGL *self) {
+  glEnable(GL_DEBUG_OUTPUT);
+  glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+  glDebugMessageCallback(MessageCallback, 0);
+
   // Initialize self
   self->name = 0;
   self->width = 0;
@@ -47,25 +59,9 @@ TextureGL *texture_gl_new() {
   return self;
 }
 
-static void texture_gl_update_callback(int reason, void *user_data) {
-  TextureGL *self = TEXTURE_GL(user_data);
-  g_message("texture_gl_update_callback");
-  if (self->fbo && self->name) {
-    glBindTexture(GL_TEXTURE_2D, self->name);
-    glBindFramebuffer(GL_FRAMEBUFFER, self->fbo);
-    int result =
-        dicom_view_common_render_gl(self->common, self->width, self->height);
-    if (result != 0) {
-      g_message("failed to render texture");
-    }
-  }
-}
-
 void texture_gl_set_dicom_common(TextureGL *self, DicomViewCommon *common) {
   g_message("texture_gl_set_dicom_common");
   self->common = common;
-  dicom_view_common_set_update_callback(common, texture_gl_update_callback,
-                                        self);
 }
 
 gboolean texture_gl_populate(FlTextureGL *texture, guint32 *target,
@@ -110,7 +106,6 @@ gboolean texture_gl_populate(FlTextureGL *texture, guint32 *target,
         dicom_view_common_render_gl(self->common, self->width, self->height);
     if (result != 0) {
       g_message("failed to render texture");
-      return FALSE;
     }
   }
 

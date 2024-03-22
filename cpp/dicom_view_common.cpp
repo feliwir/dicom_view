@@ -5,11 +5,6 @@
 #include <gdcmImageReader.h>
 
 struct _DicomViewCommon {
-  gdcm::ImageReader reader;
-
-  void (*update_cb)(int, void *) = nullptr;
-  void *update_cb_user_data = nullptr;
-
   // OpenGL
   unsigned int name = 0;
   unsigned int program = 0;
@@ -28,13 +23,14 @@ int dicom_view_common_dispose(DicomViewCommon *handle) {
 
 int dicom_view_common_load_file(DicomViewCommon *handle,
                                 const char *file_path) {
-  handle->reader.SetFileName(file_path);
-  if (!handle->reader.Read()) {
+  gdcm::ImageReader reader;
+  reader.SetFileName(file_path);
+  if (!reader.Read()) {
     return 1;
   }
 
   // Load the image
-  gdcm::Image &image = handle->reader.GetImage();
+  gdcm::Image &image = reader.GetImage();
 
   // OpenGL
   glGenTextures(1, &handle->name);
@@ -45,24 +41,15 @@ int dicom_view_common_load_file(DicomViewCommon *handle,
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
   dicom_view_render_gl_upload(handle->name, image);
 
-  if (handle->update_cb) {
-    handle->update_cb(DICOM_VIEW_COMMON_UPDATE_EVENT_IMAGE,
-                      handle->update_cb_user_data);
-  }
-
-  return 0;
-}
-
-int dicom_view_common_set_update_callback(DicomViewCommon *handle,
-                                          void (*update_cb)(int, void *),
-                                          void *user_data) {
-  handle->update_cb = update_cb;
-  handle->update_cb_user_data = user_data;
   return 0;
 }
 
 int dicom_view_common_render_gl(DicomViewCommon *handle, unsigned int width,
                                 unsigned int height) {
+  if (handle->name == 0) {
+    return 1;
+  }
+
   // Create our program
   dicom_view_render_gl_create_program(&handle->program);
   // Render our image

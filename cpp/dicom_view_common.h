@@ -16,10 +16,6 @@ enum DicomViewCommonUpdateEvent {
   DICOM_VIEW_COMMON_UPDATE_EVENT_IMAGE = 1,
 };
 
-int dicom_view_common_set_update_callback(DicomViewCommon *handle,
-                                          void (*update_cb)(int, void *),
-                                          void *user_data);
-
 // OpenGL
 int dicom_view_common_render_gl(DicomViewCommon *handle, unsigned int width,
                                 unsigned int height);

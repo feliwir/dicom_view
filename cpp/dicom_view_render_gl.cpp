@@ -150,6 +150,7 @@ int dicom_view_render_gl_create_program(unsigned int *program) {
 int dicom_view_render_gl_draw(unsigned int program, unsigned int name,
                               unsigned int width, unsigned int height) {
   glViewport(0, 0, width, height);
+  // Use our program
   glUseProgram(program);
 
   GLuint position_location = glGetAttribLocation(program, "position");
