@@ -65,7 +65,6 @@ FetchContent_Declare(
   GIT_REPOSITORY https://github.com/malaterre/GDCM
   GIT_TAG        v3.0.23
 )
-
 FetchContent_MakeAvailable(GDCM)
 target_link_libraries(${PLUGIN_NAME} PRIVATE gdcmCommon gdcmMSFF gdcmDSED -lstdc++)
 target_include_directories(${PLUGIN_NAME} PRIVATE 
@@ -73,6 +72,17 @@ target_include_directories(${PLUGIN_NAME} PRIVATE
   "${GDCM_SOURCE_DIR}/Source/Common"
   "${GDCM_BINARY_DIR}/Source/Common/"
   "${GDCM_SOURCE_DIR}/Source/MediaStorageAndFileFormat")
+
+# Add GLM dependency
+include(FetchContent)
+FetchContent_Declare(
+  glm
+  GIT_REPOSITORY      https://github.com/g-truc/glm
+  GIT_TAG             1.0.1 
+)
+FetchContent_MakeAvailable(glm)
+target_link_libraries(${PLUGIN_NAME} PRIVATE glm)
+
 
 # === Tests ===
 # These unit tests can be run from a terminal after building the example.

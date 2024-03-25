@@ -1,4 +1,12 @@
 #include "dicom_view_render_gl.h"
+// GLM
+#include <glm/ext/matrix_clip_space.hpp>
+#include <glm/ext/matrix_transform.hpp>
+#include <glm/glm.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/component_wise.hpp>
+// OpenGL
 #include <epoxy/gl.h>
 #include <flutter_linux/flutter_linux.h>
 
@@ -70,8 +78,9 @@ int dicom_view_render_gl_create_program(unsigned int *program) {
     attribute vec2 position;
     attribute vec2 texcoord;
     varying vec2 v_texcoord;
+    uniform mat4 u_mvp;
     void main() {
-      gl_Position = vec4(position, 0.0, 1.0);
+      gl_Position = u_mvp * vec4(position, 0.0, 1.0);
       v_texcoord = texcoord;
     }
   )";
@@ -79,9 +88,9 @@ int dicom_view_render_gl_create_program(unsigned int *program) {
     #version 100
     precision mediump float;
     varying vec2 v_texcoord;
-    uniform sampler2D tex;
+    uniform sampler2D u_tex;
     void main() {
-      gl_FragColor = vec4(texture2D(tex, v_texcoord).rrr * 10.0, 1.0);
+      gl_FragColor = vec4(texture2D(u_tex, v_texcoord).rrr * 10.0, 1.0);
     }
   )";
 
@@ -148,22 +157,58 @@ int dicom_view_render_gl_create_program(unsigned int *program) {
 }
 
 int dicom_view_render_gl_draw(unsigned int program, unsigned int name,
-                              unsigned int width, unsigned int height) {
-  glViewport(0, 0, width, height);
+                              const glm::ivec2 &vp_size,
+                              const glm::ivec2 &img_size,
+                              const glm::dvec3 &img_spacing,
+                              const glm::vec2 &view_offset,
+                              const glm::vec2 &view_scale) {
+  glViewport(0, 0, vp_size.x, vp_size.y);
   // Use our program
   glUseProgram(program);
 
   GLuint position_location = glGetAttribLocation(program, "position");
   GLuint texcoord_location = glGetAttribLocation(program, "texcoord");
-  GLuint tex_location = glGetUniformLocation(program, "tex");
+  GLuint tex_location = glGetUniformLocation(program, "u_tex");
+  GLuint mvp_location = glGetUniformLocation(program, "u_mvp");
+
+  auto img_size_with_spacing = glm::vec2(img_size) * glm::vec2(img_spacing);
+  g_message(
+      "img_size: %d %d img_spacing: %f %f %f img_size_with_spacing: %f %f",
+      img_size.x, img_size.y, img_spacing.x, img_spacing.y, img_spacing.z,
+      img_size_with_spacing.x, img_size_with_spacing.y);
+
+  // Set up the MVP matrix
+  auto projection =
+      glm::ortho(0.0f, (float)vp_size.x, (float)vp_size.y, 0.0f, -1.0f,
+                 1.0f); // Inverted Y axis
+  // Apply the view offset and scale
+  auto model = glm::mat4(1.0f);
+  // Center the image
+  // model = glm::translate(model, glm::vec3(-0.5f, -0.5f, 0.0f));
+  // Apply the image spacing
+  model =
+      glm::scale(model, glm::vec3(img_spacing.x, img_spacing.y, img_spacing.z));
+  // Apply the view offset
+  model = glm::translate(model, glm::vec3(view_offset.x, view_offset.y, 0.0f));
+  // Apply the view scale
+  model = glm::scale(model, glm::vec3(view_scale.x, view_scale.y, 1.0f));
+  // Apply the image size
+  model = glm::scale(model, glm::vec3(img_size_with_spacing, 1.0f));
+  // Apply the ratio of viewport & image size
+  auto fit_scale = glm::compMin(glm::vec2(vp_size) / glm::vec2(img_size));
+  model = glm::scale(model, glm::vec3(glm::vec2(fit_scale), 1.0f));
+  // Identity view
+  auto view = glm::mat4(1.0f);
+
+  auto mvp = projection * view * model;
 
   // 2D Rect
   GLfloat vertices[] = {
       // Positions    // Texture Coords
-      1.0f,  1.0f,  1.0f, 1.0f, // Top Right
-      1.0f,  -1.0f, 1.0f, 0.0f, // Bottom Right
-      -1.0f, -1.0f, 0.0f, 0.0f, // Bottom Left
-      -1.0f, 1.0f,  0.0f, 1.0f, // Top Left
+      1.0f, 1.0f, 1.0f, 1.0f, // Top Right
+      1.0f, 0.0f, 1.0f, 0.0f, // Bottom Right
+      0.0f, 0.0f, 0.0f, 0.0f, // Bottom Left
+      0.0f, 1.0f, 0.0f, 1.0f, // Top Left
   };
 
   GLuint indices[] = {
@@ -193,10 +238,12 @@ int dicom_view_render_gl_draw(unsigned int program, unsigned int name,
   glBindTexture(GL_TEXTURE_2D, name);
 
   glUniform1i(tex_location, 0);
+  glUniformMatrix4fv(mvp_location, 1, GL_FALSE, glm::value_ptr(mvp));
 
   glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-  g_message("dicom_view_render_gl_draw: %d %d %d %d", program, name, width,
-            height);
+  g_message("dicom_view_render_gl_draw: %d %d %d %d %d %d %f %f", program, name,
+            vp_size.x, vp_size.y, img_size.x, img_size.y,
+            img_size_with_spacing.x, img_size_with_spacing.y);
 
   return 0;
 }

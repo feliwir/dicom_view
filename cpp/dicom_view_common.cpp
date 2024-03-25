@@ -1,10 +1,24 @@
 #include "dicom_view_common.h"
 #include "dicom_view_render_gl.h"
+// GLM
+#include <glm/glm.hpp>
+// OpenGL
 #include <epoxy/gl.h>
 #include <flutter_linux/flutter_linux.h>
+// GDCM
 #include <gdcmImageReader.h>
 
 struct _DicomViewCommon {
+  // View parameters
+  glm::vec2 view_offset = glm::vec2(0.0f, 0.0f);
+  glm::vec2 view_scale = glm::vec2(1.0f, 1.0f);
+
+  // Image parameters
+  glm::ivec2 img_size = glm::ivec2(0, 0);
+  glm::dvec3 img_spacing = glm::dvec3(1.0, 1.0, 1.0);
+  int img_min = 0;
+  int img_max = 0;
+
   // OpenGL
   unsigned int name = 0;
   unsigned int program = 0;
@@ -31,6 +45,16 @@ int dicom_view_common_load_file(DicomViewCommon *handle,
 
   // Load the image
   gdcm::Image &image = reader.GetImage();
+  handle->img_size.x = image.GetDimension(0);
+  handle->img_size.y = image.GetDimension(1);
+  // Spacing for image voxels
+  handle->img_spacing.x = image.GetSpacing(0);
+  handle->img_spacing.y = image.GetSpacing(1);
+  handle->img_spacing.z = image.GetSpacing(2);
+  // Min-Max for level window
+  auto &format = image.GetPixelFormat();
+  handle->img_min = format.GetMin();
+  handle->img_max = format.GetMax();
 
   // OpenGL
   glGenTextures(1, &handle->name);
@@ -53,7 +77,10 @@ int dicom_view_common_render_gl(DicomViewCommon *handle, unsigned int width,
   // Create our program
   dicom_view_render_gl_create_program(&handle->program);
   // Render our image
-  dicom_view_render_gl_draw(handle->program, handle->name, width, height);
+  dicom_view_render_gl_draw(handle->program, handle->name,
+                            glm::ivec2(width, height), handle->img_size,
+                            handle->img_spacing, handle->view_offset,
+                            handle->view_scale);
 
   return 0;
 }
