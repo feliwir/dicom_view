@@ -66,8 +66,9 @@ FetchContent_Declare(
   GIT_TAG        v3.0.23
 )
 FetchContent_MakeAvailable(GDCM)
-target_link_libraries(${PLUGIN_NAME} PRIVATE gdcmCommon gdcmMSFF gdcmDSED -lstdc++)
+target_link_libraries(${PLUGIN_NAME} PRIVATE gdcmCommon gdcmDICT gdcmMSFF gdcmDSED -lstdc++)
 target_include_directories(${PLUGIN_NAME} PRIVATE 
+  "${GDCM_SOURCE_DIR}/Source/DataDictionary"
   "${GDCM_SOURCE_DIR}/Source/DataStructureAndEncodingDefinition"
   "${GDCM_SOURCE_DIR}/Source/Common"
   "${GDCM_BINARY_DIR}/Source/Common/"

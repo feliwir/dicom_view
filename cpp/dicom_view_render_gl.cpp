@@ -62,6 +62,9 @@ int dicom_view_render_gl_upload(unsigned int name, gdcm::Image &image) {
   return 0;
 }
 
+/// @brief
+/// @param program
+/// @return
 int dicom_view_render_gl_create_program(unsigned int *program) {
   if (program == nullptr)
     return 1;
@@ -89,8 +92,16 @@ int dicom_view_render_gl_create_program(unsigned int *program) {
     precision mediump float;
     varying vec2 v_texcoord;
     uniform sampler2D u_tex;
+    uniform vec2 u_scaleBias;
+    uniform float u_windowWidth;
+    uniform float u_windowCenter;
     void main() {
-      gl_FragColor = vec4(texture2D(u_tex, v_texcoord).rrr * 10.0, 1.0);
+      float distance = 4096.0;
+      float pixelValue = texture2D(u_tex, v_texcoord).r * distance * u_scaleBias.x + u_scaleBias.y;
+      float minValue = u_windowCenter - 0.5 * u_windowWidth;
+      float maxValue = u_windowCenter + 0.5 * u_windowWidth;
+      float normalizedValue = (pixelValue - minValue) / (maxValue - minValue);
+      gl_FragColor = vec4(vec3(normalizedValue), 1.0);
     }
   )";
 
@@ -156,12 +167,12 @@ int dicom_view_render_gl_create_program(unsigned int *program) {
   return 0;
 }
 
-int dicom_view_render_gl_draw(unsigned int program, unsigned int name,
-                              const glm::ivec2 &vp_size,
-                              const glm::ivec2 &img_size,
-                              const glm::dvec3 &img_spacing,
-                              const glm::vec2 &view_offset,
-                              const glm::vec2 &view_scale) {
+int dicom_view_render_gl_draw(
+    unsigned int program, unsigned int name, const glm::ivec2 &vp_size,
+    const glm::ivec2 &img_size, const glm::dvec3 &img_spacing,
+    const glm::vec2 &img_scalebias,
+    const glm::vec2 &view_offset, const glm::vec2 &view_scale,
+    float view_window_width, float view_window_center) {
   glViewport(0, 0, vp_size.x, vp_size.y);
   // Use our program
   glUseProgram(program);
@@ -170,6 +181,10 @@ int dicom_view_render_gl_draw(unsigned int program, unsigned int name,
   GLuint texcoord_location = glGetAttribLocation(program, "texcoord");
   GLuint tex_location = glGetUniformLocation(program, "u_tex");
   GLuint mvp_location = glGetUniformLocation(program, "u_mvp");
+  GLuint scalebias_location = glGetUniformLocation(program, "u_scaleBias");
+  GLuint windowwidth_location = glGetUniformLocation(program, "u_windowWidth");
+  GLuint windowcenter_location =
+      glGetUniformLocation(program, "u_windowCenter");
 
   auto img_size_with_spacing = glm::vec2(img_size) * glm::vec2(img_spacing);
   g_message(
@@ -178,25 +193,30 @@ int dicom_view_render_gl_draw(unsigned int program, unsigned int name,
       img_size_with_spacing.x, img_size_with_spacing.y);
 
   // Set up the MVP matrix
-  auto projection =
-      glm::ortho(0.0f, (float)vp_size.x, (float)vp_size.y, 0.0f, -1.0f,
-                 1.0f); // Inverted Y axis
+  auto projection = glm::ortho(0.0f, (float)1.0f, (float)1.0f, 0.0f, -1.0f,
+                               1.0f); // Inverted Y axis
   // Apply the view offset and scale
   auto model = glm::mat4(1.0f);
-  // Center the image
-  // model = glm::translate(model, glm::vec3(-0.5f, -0.5f, 0.0f));
+  // // Center the image
+  // model = glm::translate(model, glm::vec3(0.5f * glm::vec2(vp_size -
+  // img_size), 0.0f));
+  // // Apply the image size
+  // model = glm::scale(model, glm::vec3(img_size, 1.0f));
+
   // Apply the image spacing
-  model =
-      glm::scale(model, glm::vec3(img_spacing.x, img_spacing.y, img_spacing.z));
-  // Apply the view offset
-  model = glm::translate(model, glm::vec3(view_offset.x, view_offset.y, 0.0f));
-  // Apply the view scale
-  model = glm::scale(model, glm::vec3(view_scale.x, view_scale.y, 1.0f));
-  // Apply the image size
-  model = glm::scale(model, glm::vec3(img_size_with_spacing, 1.0f));
-  // Apply the ratio of viewport & image size
-  auto fit_scale = glm::compMin(glm::vec2(vp_size) / glm::vec2(img_size));
-  model = glm::scale(model, glm::vec3(glm::vec2(fit_scale), 1.0f));
+  // model =
+  //     glm::scale(model, glm::vec3(img_spacing.x, img_spacing.y,
+  //     img_spacing.z));
+  // // Apply the view offset
+  // model = glm::translate(model, glm::vec3(view_offset.x, view_offset.y,
+  // 0.0f));
+  // // Apply the view scale
+  // model = glm::scale(model, glm::vec3(view_scale.x, view_scale.y, 1.0f));
+  // // Apply the image size
+  // model = glm::scale(model, glm::vec3(img_size, 1.0f));
+  // // Apply the ratio of viewport & image size
+  // auto fit_scale = glm::compMin(glm::vec2(vp_size) / glm::vec2(img_size));
+  // model = glm::scale(model, glm::vec3(glm::vec2(fit_scale), 1.0f));
   // Identity view
   auto view = glm::mat4(1.0f);
 
@@ -239,6 +259,9 @@ int dicom_view_render_gl_draw(unsigned int program, unsigned int name,
 
   glUniform1i(tex_location, 0);
   glUniformMatrix4fv(mvp_location, 1, GL_FALSE, glm::value_ptr(mvp));
+  glUniform2f(scalebias_location, img_scalebias.x, img_scalebias.y);
+  glUniform1f(windowwidth_location, view_window_width);
+  glUniform1f(windowcenter_location, view_window_center);
 
   glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
   g_message("dicom_view_render_gl_draw: %d %d %d %d %d %d %f %f", program, name,

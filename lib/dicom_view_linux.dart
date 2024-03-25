@@ -51,7 +51,7 @@ class _DicomViewLinuxState extends State<DicomViewLinux> {
             _textureId = (snapshot.data) ?? 0;
             return Texture(textureId: _textureId);
           }
-          return const CircularProgressIndicator();
+          return const SizedBox();
         });
   }
 }
