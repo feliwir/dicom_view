@@ -1,11 +1,11 @@
-import 'package:dicom_view/dicom_view_method_channel.dart';
+import 'package:dicom_view/src/dicom_view_method_channel.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
-import 'dicom_view_linux.dart';
-import 'dicom_view_platform_interface.dart';
+import 'src/dicom_view_linux.dart';
+import 'src/dicom_view_platform_interface.dart';
 
 class DicomViewPlugin {
   Future<String?> getPlatformVersion() {
@@ -37,6 +37,12 @@ class DicomView extends StatelessWidget {
                   OneSequenceGestureRecognizer>>{},
             ));
       case TargetPlatform.iOS:
+        return UiKitView(
+          viewType: 'plugins.dicom_view/dicom_view',
+          onPlatformViewCreated: _onPlatformViewCreated,
+          gestureRecognizers: const <Factory<OneSequenceGestureRecognizer>>{},
+        );
+      case TargetPlatform.macOS:
         return UiKitView(
           viewType: 'plugins.dicom_view/dicom_view',
           onPlatformViewCreated: _onPlatformViewCreated,

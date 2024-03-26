@@ -7,21 +7,23 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/component_wise.hpp>
 // OpenGL
+#ifdef __linux__
 #include <epoxy/gl.h>
-#include <flutter_linux/flutter_linux.h>
+#elif defined(__APPLE__)
+#include <OpenGL/gl.h>
+#endif
 
-int dicom_view_render_gl_upload(unsigned int name, gdcm::Image &image) {
+int dicom_view_render_gl_upload(unsigned int name, gdcm::Image &image)
+{
   auto width = image.GetDimension(0);
   auto height = image.GetDimension(1);
-  g_message("dicom_view_render_gl_upload: %d %d %d", name, width, height);
   glBindTexture(GL_TEXTURE_2D, name);
   char *buffer = new char[image.GetBufferLength()];
-  if (image.GetBuffer(buffer)) {
+  if (image.GetBuffer(buffer))
+  {
     auto &format = image.GetPixelFormat();
-    g_message("scalartype: %d bitsAllocated: %i bitsStored: %i",
-              format.GetScalarType(), format.GetBitsAllocated(),
-              format.GetBitsStored());
-    switch (format.GetScalarType()) {
+    switch (format.GetScalarType())
+    {
     case gdcm::PixelFormat::INT8:
       glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, width, height, 0, GL_RED,
                    GL_UNSIGNED_BYTE, buffer);
@@ -54,10 +56,10 @@ int dicom_view_render_gl_upload(unsigned int name, gdcm::Image &image) {
       glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, width, height, 0, GL_RED,
                    GL_DOUBLE, buffer);
     default:
-      g_message("Unsupported pixel format");
       return 1;
     }
-  } else
+  }
+  else
     return 1;
   return 0;
 }
@@ -65,7 +67,8 @@ int dicom_view_render_gl_upload(unsigned int name, gdcm::Image &image) {
 /// @brief
 /// @param program
 /// @return
-int dicom_view_render_gl_create_program(unsigned int *program) {
+int dicom_view_render_gl_create_program(unsigned int *program)
+{
   if (program == nullptr)
     return 1;
   if (*program != 0)
@@ -111,13 +114,17 @@ int dicom_view_render_gl_create_program(unsigned int *program) {
   // Check if the shader linked successfully
   GLint compiled;
   glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &compiled);
-  if (!compiled) {
+  if (!compiled)
+  {
     GLint info_len = 0;
     glGetShaderiv(vertex_shader, GL_INFO_LOG_LENGTH, &info_len);
-    if (info_len > 1) {
+    if (info_len > 1)
+    {
       char *info_log = (char *)malloc(sizeof(char) * info_len);
       glGetShaderInfoLog(vertex_shader, info_len, NULL, info_log);
+#ifdef __linux__
       g_message("Error compiling vertex shader: %s", info_log);
+#endif
       free(info_log);
     }
     glDeleteShader(vertex_shader);
@@ -129,13 +136,17 @@ int dicom_view_render_gl_create_program(unsigned int *program) {
   glCompileShader(fragment_shader);
   // Check if the shader linked successfully
   glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &compiled);
-  if (!compiled) {
+  if (!compiled)
+  {
     GLint info_len = 0;
     glGetShaderiv(fragment_shader, GL_INFO_LOG_LENGTH, &info_len);
-    if (info_len > 1) {
+    if (info_len > 1)
+    {
       char *info_log = (char *)malloc(sizeof(char) * info_len);
       glGetShaderInfoLog(fragment_shader, info_len, NULL, info_log);
+#ifdef __linux__
       g_message("Error compiling fragment shader: %s", info_log);
+#endif
       free(info_log);
     }
     glDeleteShader(fragment_shader);
@@ -150,13 +161,17 @@ int dicom_view_render_gl_create_program(unsigned int *program) {
   // Check if the program linked successfully
   GLint linked;
   glGetProgramiv(*program, GL_LINK_STATUS, &linked);
-  if (!linked) {
+  if (!linked)
+  {
     GLint info_len = 0;
     glGetProgramiv(*program, GL_INFO_LOG_LENGTH, &info_len);
-    if (info_len > 1) {
+    if (info_len > 1)
+    {
       char *info_log = (char *)malloc(sizeof(char) * info_len);
       glGetProgramInfoLog(*program, info_len, NULL, info_log);
+#ifdef __linux__
       g_message("Error linking program: %s", info_log);
+#endif
       free(info_log);
     }
     glDeleteProgram(*program);
@@ -172,7 +187,8 @@ int dicom_view_render_gl_draw(
     const glm::ivec2 &img_size, const glm::dvec3 &img_spacing,
     const glm::vec2 &img_scalebias,
     const glm::vec2 &view_offset, const glm::vec2 &view_scale,
-    float view_window_width, float view_window_center) {
+    float view_window_width, float view_window_center)
+{
   glViewport(0, 0, vp_size.x, vp_size.y);
   // Use our program
   glUseProgram(program);
@@ -187,10 +203,6 @@ int dicom_view_render_gl_draw(
       glGetUniformLocation(program, "u_windowCenter");
 
   auto img_size_with_spacing = glm::vec2(img_size) * glm::vec2(img_spacing);
-  g_message(
-      "img_size: %d %d img_spacing: %f %f %f img_size_with_spacing: %f %f",
-      img_size.x, img_size.y, img_spacing.x, img_spacing.y, img_spacing.z,
-      img_size_with_spacing.x, img_size_with_spacing.y);
 
   // Set up the MVP matrix
   auto projection = glm::ortho(0.0f, (float)1.0f, (float)1.0f, 0.0f, -1.0f,
@@ -232,7 +244,12 @@ int dicom_view_render_gl_draw(
   };
 
   GLuint indices[] = {
-      0, 1, 2, 0, 2, 3,
+      0,
+      1,
+      2,
+      0,
+      2,
+      3,
   };
 
   GLuint vbo, ebo;
@@ -264,9 +281,6 @@ int dicom_view_render_gl_draw(
   glUniform1f(windowcenter_location, view_window_center);
 
   glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-  g_message("dicom_view_render_gl_draw: %d %d %d %d %d %d %f %f", program, name,
-            vp_size.x, vp_size.y, img_size.x, img_size.y,
-            img_size_with_spacing.x, img_size_with_spacing.y);
 
   return 0;
 }

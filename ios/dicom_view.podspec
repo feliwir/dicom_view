@@ -3,6 +3,8 @@
 # Run `pod lib lint dicom_view.podspec` to validate before publishing.
 #
 Pod::Spec.new do |s|
+  system ("cmake -G Xcode && cmake -B build -S macos")
+
   s.name             = 'dicom_view'
   s.version          = '0.0.1'
   s.summary          = 'A new Flutter plugin project.'

@@ -3,8 +3,11 @@
 // GLM
 #include <glm/glm.hpp>
 // OpenGL
+#ifdef __linux__
 #include <epoxy/gl.h>
-#include <flutter_linux/flutter_linux.h>
+#elif defined(__APPLE__)
+#include <OpenGL/gl.h>
+#endif
 // GDCM
 #include <gdcmAttribute.h>
 #include <gdcmImageReader.h>
@@ -56,8 +59,6 @@ int dicom_view_common_load_file(DicomViewCommon *handle,
   wc.SetFromDataSet(ds);
   handle->view_window_center = wc.GetValue();
   handle->view_window_width = ww.GetValue();
-  g_message("window center: %f window width: %f", handle->view_window_center,
-            handle->view_window_width);
 
   // Load the image
   gdcm::Image &image = reader.GetImage();
@@ -71,12 +72,9 @@ int dicom_view_common_load_file(DicomViewCommon *handle,
   auto &format = image.GetPixelFormat();
   handle->img_minmax.x = format.GetMin();
   handle->img_minmax.y = format.GetMax();
-  g_message("min max: %d %d", handle->img_minmax.x, handle->img_minmax.y);
   // Scale-bias
   handle->img_scalebias.x = image.GetSlope();
   handle->img_scalebias.y = image.GetIntercept();
-  g_message("slope: %f intercept: %f", handle->img_scalebias.x,
-            handle->img_scalebias.y);
 
   // OpenGL
   glGenTextures(1, &handle->name);
